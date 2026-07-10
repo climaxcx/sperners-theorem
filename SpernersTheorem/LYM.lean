@@ -56,7 +56,13 @@ lemma CountingB {𝒜 : Family n}
 
 theorem local_lym_mul {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) :
     𝒜.shadow.card * (n - (r - 1)) ≥ 𝒜.card * r := by
-  sorry
+  nth_rw 2 [← CountingA]
+  · rw[ge_iff_le]
+    exact CountingB h𝒜
+  exact h𝒜
+
+
+
 
 
 theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) :
