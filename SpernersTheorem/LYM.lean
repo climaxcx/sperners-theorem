@@ -64,9 +64,8 @@ theorem local_lym_mul {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) :
 
 
 
-
-theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) :
-    𝒜.shadow.card / (Layer n (r-1)).card ≥ 𝒜.card / (Layer n r).card := by
+theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hr : r ≠ 0) :
+    (𝒜.shadow.card : ℚ) / (Layer n (r-1)).card ≥ 𝒜.card / ↑(Layer n r).card := by
   sorry
 
 
