@@ -28,7 +28,26 @@ def incidences (𝒜 : Family n) :
   𝒜.biUnion fun A =>
     (fiberOver 𝒜 A).image (fun B => (A, B))
 
-
+theorem mem_incidences_iff (𝒜 : Family n) : -- incidences are equivalent to original definitions
+    (A, B) ∈ incidences 𝒜 ↔
+      A ∈ 𝒜 ∧ B ∈ 𝒜.shadow ∧ B ⊆ A := by
+  refine Iff.intro ?_ ?_
+  · intro h
+    rw[incidences] at h
+    simp_all only [Finset.mem_biUnion, Finset.mem_image, Prod.mk.injEq, exists_eq_right_right, true_and]
+    obtain ⟨left, right⟩ := h
+    apply And.intro
+    · exact Finset.mem_of_mem_filter B right
+    rw[fiberOver, Finset.mem_filter] at right
+    exact right.right
+  intro ⟨hA, hB, hBA⟩
+  rw[incidences]
+  refine Finset.mem_biUnion.mpr ?_
+  refine Exists.intro A ?_
+  simp_all only [Finset.mem_image, Prod.mk.injEq, true_and, exists_eq_right]
+  rw[fiberOver]
+  refine Finset.mem_filter.mpr ?_
+  simp_all only [and_self]
 
 theorem mem_layer_card (𝒜 : Family n)
     (A : Finset (Fin n))
@@ -152,6 +171,83 @@ lemma CountingA {𝒜 : Family n}
   simp_all only [Prod.mk.injEq]
 
 
+theorem exists_insert {B C : Finset (Fin n)}
+    (hsub : B ⊆ C)
+    (hcard : B.card + 1 = C.card) :
+    ∃ x, x ∉ B ∧ insert x B = C := by
+  have  : ∃ a, (C \ B) = {a} := by
+    refine Finset.card_eq_one.mp ?_
+    rw [Finset.card_sdiff_of_subset hsub]
+    exact Eq.symm (Nat.eq_sub_of_add_eq' hcard)
+  rcases this with ⟨a, h⟩
+  refine Exists.intro a ?_
+  have : a ∈ C \ B := by
+      simp_all only [Finset.mem_singleton]
+  rw[Finset.mem_sdiff] at this
+  apply And.intro
+  · exact this.right
+  obtain ⟨left, right⟩ := this
+  rw[Finset.insert_eq]
+  rw[←h]
+  simp only [Finset.sdiff_union_self_eq_union, Finset.union_eq_left]
+  exact hsub
+
+
+theorem t1 (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hr : 0 < r) :
+    ∀ B ∈ 𝒜.shadow, {A ∈ Layer n r | B ⊆ A}.card = n - (r - 1) := by
+  intro B hB
+  have : B.card = r - 1 := by
+    rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at hB
+    obtain ⟨C, hC, _, hcard⟩ := hB
+    have : C.card = r := by
+      refine mem_layer_card_nat (Layer n r) C (h𝒜 hC) ?_
+      rfl
+    subst this
+    simp_all only [lt_add_iff_pos_left, Order.lt_add_one_iff, zero_le, add_tsub_cancel_right]
+  have : Bᶜ.card = n - (r - 1) := by
+    refine Nat.eq_sub_of_add_eq ?_
+    rw[←this]
+    simp only [Finset.card_compl_add_card, Fintype.card_fin]
+  rw[←this]
+  apply Eq.symm
+  refine Finset.card_bij (fun (a : Fin n) (_ : a ∈ Bᶜ) => insert a B) ?_ ?_ ?_
+  · intro a ha
+    rw[Finset.mem_filter]
+    simp only [Finset.mem_powersetCard, Finset.subset_univ, true_and, Finset.subset_insert,
+      and_true]
+    simp_all only [Finset.mem_compl, not_false_eq_true, Finset.card_insert_of_notMem]
+    exact Nat.sub_add_cancel hr
+  · intro a ha b hb h
+    simp_all only [Finset.mem_compl]
+    exact (Finset.insert_inj ha).mp h
+  intro C hC
+  rw[Finset.mem_filter] at hC
+  rcases hC with ⟨hClay, hBC⟩
+  have : ∃ a, insert a B = C := by
+    have : B.card + 1 = C.card := by
+      have : C.card = r := by
+        refine mem_layer_card_nat (Layer n r) C hClay ?_
+        rfl
+      subst this
+      simp_all only [Finset.card_pos, Finset.mem_powersetCard, Finset.subset_univ, and_self,
+      Finset.one_le_card, Nat.sub_add_cancel]
+    obtain ⟨a, _, h⟩ := (exists_insert hBC this)
+    exact Exists.intro a h
+  rcases this with ⟨a, hA⟩
+  refine Exists.intro a ?_
+  refine Exists.intro ?_ ?_
+  · refine Finset.mem_compl.mpr ?_
+    intro h
+    rw[Finset.insert_eq_of_mem] at hA
+    · have : B ≠ C := by
+        rename_i this_1
+        subst hA
+        simp_all only [Finset.mem_powersetCard, Finset.subset_univ, true_and,
+        subset_refl, ne_eq, not_true_eq_false]
+        omega
+      exact Ne.elim this hA
+    exact h
+  exact hA
 
 
 
@@ -161,7 +257,7 @@ lemma CountingB {𝒜 : Family n}
     (incidences 𝒜).card ≤ 𝒜.shadow.card * (n - (r - 1)) := by
   sorry
 
-theorem local_lym_mul {n r} (𝒜 : Family n) (hrn : r ≤ n) (h𝒜 : 𝒜 ⊆ Layer n r) :
+theorem local_lym_mul {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) :
     𝒜.shadow.card * (n - (r - 1)) ≥ 𝒜.card * r := by
   nth_rw 2 [← CountingA]
   · rw[ge_iff_le]
@@ -173,15 +269,6 @@ theorem local_lym_mul {n r} (𝒜 : Family n) (hrn : r ≤ n) (h𝒜 : 𝒜 ⊆ 
 
 theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hrn : r ≤ n) (hr : r ≠ 0) :
     (𝒜.shadow.card : ℚ) / (Layer n (r-1)).card ≥ 𝒜.card / ↑(Layer n r).card := by
-  simp only [Finset.card_powersetCard, Finset.card_univ, Fintype.card_fin]
-  refine (div_le_div_iff₀ ?_ ?_).mpr ?_
-  · rw[Nat.cast_pos]
-    apply Nat.choose_pos
-    assumption
-  · rw[Nat.cast_pos]
-    apply Nat.choose_pos
-    refine Nat.sub_le_iff_le_add.mpr ?_
-    exact Nat.le_add_right_of_le hrn
   sorry
 
 
