@@ -14,14 +14,21 @@ abbrev IsSubsetAntichain {n} (C : Family n) :=
 abbrev Layer (n k : ℕ) : Family n :=
   (Finset.univ : Finset (Fin n)).powersetCard k
 
-def incidences (𝒜 : Family n) :
-    Finset (Finset (Fin n) × Finset (Fin n)) :=
-  (𝒜.product (Finset.shadow 𝒜)).filter
-    (fun p => p.2 ⊆ p.1)
+-- def incidences (𝒜 : Family n) :
+--     Finset (Finset (Fin n) × Finset (Fin n)) :=
+--   (𝒜.product (Finset.shadow 𝒜)).filter
+--     (fun p => p.2 ⊆ p.1)
 
 def fiberOver {n} (𝒜 : Family n) (A : Finset (Fin n)) :
     Finset (Finset (Fin n)) :=
   (Finset.shadow 𝒜).filter (fun B => B ⊆ A)
+
+def incidences (𝒜 : Family n) :
+    Finset (Finset (Fin n) × Finset (Fin n)) :=
+  𝒜.biUnion fun A =>
+    (fiberOver 𝒜 A).image (fun B => (A, B))
+
+
 
 theorem mem_layer_card (𝒜 : Family n)
     (A : Finset (Fin n))
@@ -33,6 +40,13 @@ theorem mem_layer_card (𝒜 : Family n)
   have : B ∈ Finset.powersetCard r Finset.univ := by
     exact Finset.mem_def.mpr (hlay hB)
   simp_all only [Finset.mem_powersetCard, Finset.subset_univ, true_and]
+
+theorem mem_layer_card_nat (𝒜 : Family n)
+    (A : Finset (Fin n))
+    (hA : A ∈ 𝒜) (hlay : 𝒜 ⊆ Layer n r) :
+    A.card = r := by
+  rw[Layer] at hlay
+  exact Finset.mem_powersetCard_univ.mp (hlay hA)
 
 theorem fiber_layer_eq (𝒜 : Family n) (A : Finset (Fin n)) (hA : A ∈ 𝒜) (hlay : 𝒜 ⊆ Layer n r) :
     fiberOver 𝒜 A = ({A} : Family n).shadow := by
@@ -114,11 +128,31 @@ theorem card_layer :
   simp only [Finset.card_powersetCard, Finset.card_univ, Fintype.card_fin]
 
 
-
 lemma CountingA {𝒜 : Family n}
     (h𝒜 : 𝒜 ⊆ Layer n r) :
     (incidences 𝒜).card = 𝒜.card * r := by
-  sorry
+  rw[incidences, Finset.card_biUnion, Finset.sum_const_nat]
+  · intro A hA
+    have : A.card = r := by
+      exact mem_layer_card_nat 𝒜 _ hA h𝒜
+    rw[Finset.card_image_of_injective]
+    · rw[←this]
+      exact card_fiber 𝒜 h𝒜 hA
+    exact Prod.mk_right_injective A
+  rw[Finset.pairwiseDisjoint_iff]
+  intro A hA B hB hneq
+  rcases hneq with ⟨p, hp⟩
+  simp_all only [SetLike.mem_coe, Finset.mem_inter, Finset.mem_image]
+  obtain ⟨fst, snd⟩ := p
+  obtain ⟨left, right⟩ := hp
+  obtain ⟨w, h⟩ := left
+  obtain ⟨w_1, h_1⟩ := right
+  obtain ⟨left, right⟩ := h
+  obtain ⟨left_1, right_1⟩ := h_1
+  simp_all only [Prod.mk.injEq]
+
+
+
 
 
 
