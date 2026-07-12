@@ -250,18 +250,110 @@ theorem t1 (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hr : 0 < r) :
   exact hA
 
 
+def upperFiber (𝒜 : Family n) (B : Finset (Fin n)) : Family n :=
+  𝒜.filter (fun A => B ⊆ A)
+
+theorem card_upperFiber
+    {𝒜 : Family n}
+    (h𝒜 : 𝒜 ⊆ Layer n r)
+    (hr : 0 < r)
+    (hB : B ∈ Finset.shadow 𝒜) :
+    (upperFiber 𝒜 B).card ≤ n - (r - 1) := by
+  rw[upperFiber]
+  have : {A ∈ 𝒜 | B ⊆ A}.card ≤ {A ∈ Layer n r | B ⊆ A}.card := by
+    have : {A ∈ 𝒜 | B ⊆ A} ⊆ {A ∈ Layer n r | B ⊆ A} := by
+      exact Finset.filter_subset_filter (fun A ↦ B ⊆ A) h𝒜
+    exact Finset.card_le_card this
+  rw[←t1 𝒜 h𝒜 hr B hB]
+  exact this
+
+def incidencesByShadow (𝒜 : Family n) :
+    Finset (Finset (Fin n) × Finset (Fin n)) :=
+  (Finset.shadow 𝒜).biUnion fun B =>
+    (upperFiber 𝒜 B).image (fun A => (A, B))
+
+theorem incidences_eq_byShadow :
+    incidences 𝒜 = incidencesByShadow 𝒜 := by
+  ext p
+  obtain ⟨A, B⟩ := p
+  apply Iff.intro
+  · intro h
+    rw[incidencesByShadow, Finset.mem_biUnion]
+    rw[mem_incidences_iff] at h
+    obtain ⟨hA, hB, hBA⟩ := h
+    refine Exists.intro B ?_
+    refine And.intro hB ?_
+    refine Finset.mem_image.mpr ?_
+    refine Exists.intro A ?_
+    refine And.intro ?_ ?_
+    · rw[upperFiber]
+      simp_all only [Finset.mem_filter, and_self]
+    rfl
+  · intro h
+    rw[incidencesByShadow, Finset.mem_biUnion] at h
+    obtain ⟨C, hC, h⟩ := h
+    rw[Finset.mem_image] at h
+    obtain ⟨D, h1, h2⟩ := h
+    have hDA: D = A := by
+      simp_all only [Prod.mk.injEq]
+    have hCB : C = B := by
+      simp_all only [Prod.mk.injEq]
+    rw[upperFiber, Finset.mem_filter] at h1
+    obtain ⟨hD𝒜, hCD⟩ := h1
+    rw[mem_incidences_iff]
+    apply And.intro
+    · aesop
+    · apply And.intro
+      · aesop
+      · aesop
+
+theorem incidences_card_eq_sum_upperFiber :
+  (incidences 𝒜).card =
+    ∑ B ∈ Finset.shadow 𝒜,
+      (upperFiber 𝒜 B).card := by
+  rw[incidences_eq_byShadow, incidencesByShadow, Finset.card_biUnion]
+  · refine Finset.sum_congr rfl ?_
+    intro A hA
+    refine Finset.card_image_of_injective (upperFiber 𝒜 A) ?_
+    exact Prod.mk_left_injective A
+  intro A hA B hB hneq
+  unfold Function.onFun
+  rw[Finset.disjoint_left]
+  intro p hpA hpB
+  rw[Finset.mem_image] at hpA hpB
+  simp_all only [SetLike.mem_coe, ne_eq]
+  obtain ⟨fst, snd⟩ := p
+  obtain ⟨w, h⟩ := hpA
+  obtain ⟨w_1, h_1⟩ := hpB
+  obtain ⟨left, right⟩ := h
+  obtain ⟨left_1, right_1⟩ := h_1
+  simp_all only [Prod.mk.injEq, not_true_eq_false]
+
 
 
 lemma CountingB {𝒜 : Family n}
+    (hr : 0 < r)
     (h𝒜 : 𝒜 ⊆ Layer n r) :
     (incidences 𝒜).card ≤ 𝒜.shadow.card * (n - (r - 1)) := by
-  sorry
+  rw[incidences_card_eq_sum_upperFiber]
+  rw[←Finset.sum_const_nat (f := fun _ => n - (r - 1))]
+  · refine Finset.sum_le_sum ?_
+    intro A hA
+    exact card_upperFiber h𝒜 hr hA
+  intro _ _
+  rfl
 
-theorem local_lym_mul {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) :
+
+
+
+
+
+
+theorem local_lym_mul {n r} (𝒜 : Family n) (hr : 0 < r) (h𝒜 : 𝒜 ⊆ Layer n r) :
     𝒜.shadow.card * (n - (r - 1)) ≥ 𝒜.card * r := by
   nth_rw 2 [← CountingA]
   · rw[ge_iff_le]
-    exact CountingB h𝒜
+    exact CountingB hr h𝒜
   exact h𝒜
 
 
