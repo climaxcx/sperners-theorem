@@ -682,4 +682,50 @@ theorem lym {n} (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
   _ = 1 := by
       exact Rat.inv_mul_cancel ↑n.factorial (Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero n))
 
+
+theorem sperners (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
+    𝒜.card ≤ n.choose (n/2) := by
+  have : (𝒜.card : ℚ) / n.choose (n/2) ≤ 1 := by
+    have hne0 : (n.choose (n / 2) : ℚ) ≠ 0 := by
+      exact Nat.cast_ne_zero.mpr (Nat.choose_ne_zero (by omega))
+    calc (𝒜.card : ℚ) / n.choose (n/2)
+      = (∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ)) / n.choose (n / 2) := by
+          have : 𝒜.card = ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card := by
+            refine Finset.card_eq_sum_card_fiberwise ?_
+            refine Finset.mapsTo_iff_image_subset.mpr ?_
+            refine Finset.subset_range.mpr ?_
+            intro i hi
+            rw[Finset.mem_image] at hi
+            obtain ⟨A, hA, hcardA⟩ := hi
+            rw[←hcardA]
+            refine Order.lt_add_one_iff.mpr ?_
+            exact card_finset_fin_le A
+          rw[this]
+          simp_all only [Nat.cast_sum]
+    _ = ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / n.choose (n / 2) := by
+          refine (mul_inv_eq_iff_eq_mul₀ ?_).mpr ?_
+          · exact hne0
+          rw[Finset.sum_mul]
+          refine Finset.sum_congr rfl ?_
+          intro r hr
+          refine Eq.symm (Rat.div_mul_cancel ?_)
+          · exact hne0
+    _ ≤ ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / n.choose r := by
+          refine Finset.sum_le_sum ?_
+          intro r hr
+          refine div_le_div_of_nonneg_left ?_ ?_ ?_
+          · exact Rat.natCast_nonneg
+          · refine Rat.natCast_pos.mpr ?_
+            refine Nat.choose_pos ?_
+            exact Finset.mem_range_succ_iff.mp hr
+          refine Rat.natCast_le_natCast.mpr ?_
+          exact Nat.choose_le_middle r n
+    _ ≤ 1 := by
+          exact lym 𝒜 h𝒜
+  have hzle : 0 < (n.choose (n / 2) : ℚ) := by
+    refine Rat.natCast_pos.mpr ?_
+    refine Nat.choose_pos ?_
+    exact Nat.div_le_self n 2
+  have := (div_le_one hzle).mp this
+  exact Rat.natCast_le_natCast.mp this
 end Sperners
