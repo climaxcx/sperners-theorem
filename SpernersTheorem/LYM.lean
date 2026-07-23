@@ -12,7 +12,6 @@ abbrev IsSubsetAntichain {n} (C : Family n) :=
   IsAntichain (· ⊆ ·) (C : Set (Finset (Fin n)))
 
 
-
 theorem IsSubsetAntichain.subset (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (h : F ⊆ 𝒜) :
     IsSubsetAntichain F := by
   unfold IsSubsetAntichain
@@ -35,6 +34,8 @@ def incidences (𝒜 : Family n) :
     Finset (Finset (Fin n) × Finset (Fin n)) :=
   𝒜.biUnion fun A =>
     (fiberOver 𝒜 A).image (fun B => (A, B))
+
+-- {(A, B) : A ∈ 𝒜, B ∈ fiberOver 𝒜 A}
 
 theorem mem_incidences_iff (𝒜 : Family n) : -- incidences are equivalent to original definitions
     (A, B) ∈ incidences 𝒜 ↔
@@ -121,6 +122,7 @@ theorem fiber_equiv (𝒜 : Family n) (hA : A ∈ 𝒜) (hlay : 𝒜 ⊆ Layer n
   intro b ⟨left, right⟩
   subst this h
   exact (Finset.erase_inj A left).mp right
+
 
 
 
@@ -284,6 +286,8 @@ def incidencesByShadow (𝒜 : Family n) :
   (Finset.shadow 𝒜).biUnion fun B =>
     (upperFiber 𝒜 B).image (fun A => (A, B))
 
+-- {(A, B) : }
+
 theorem incidences_eq_byShadow :
     incidences 𝒜 = incidencesByShadow 𝒜 := by
   ext p
@@ -361,12 +365,16 @@ lemma CountingB {𝒜 : Family n}
 
 
 
+
+
 theorem local_lym_mul {n r} (𝒜 : Family n) (hr : 0 < r) (h𝒜 : 𝒜 ⊆ Layer n r) :
     𝒜.shadow.card * (n - (r - 1)) ≥ 𝒜.card * r := by
   nth_rw 2 [← CountingA]
   · rw[ge_iff_le]
     exact CountingB hr h𝒜
   exact h𝒜
+
+
 
 theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hrn : r ≤ n) (hr : r < 0) :
     (𝒜.shadow.card : ℚ) / (Layer n (r-1)).card ≥ 𝒜.card / ↑(Layer n r).card := by
@@ -393,6 +401,8 @@ theorem shadow_ninter_slice (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (
 def F (𝒜 : Family n) (r : Fin (n + 1)) :
     Family n :=
   𝒜.slice r
+
+-- structure Ff (𝒜 : Family n) (r : Fin (n + 1)) where
 
 noncomputable def G (𝒜 : Family n) : (k : ℕ) → k ≤ n → Family n
 | 0, h =>
@@ -514,6 +524,8 @@ theorem G_local_lym_mul (𝒜 : Family n) (k : ℕ) (hkle : k < n) :
   have : (n - (n - k - 1)) = k + 1 := by omega
   rw[this] at h
   exact h
+
+
 
 
 theorem t2 (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (r : ℕ) (hr : r ≤ n) :
@@ -682,6 +694,48 @@ theorem lym {n} (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
   _ = 1 := by
       exact Rat.inv_mul_cancel ↑n.factorial (Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero n))
 
+lemma l1 (f : ℕ → ℚ) (𝒜 : Family n) :
+    ∑ A ∈ 𝒜, f A.card = ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * f r := by
+  have hh (r : ℕ): ∑ A ∈ 𝒜.slice r, f r = (𝒜.slice r).card * f r := by
+    exact Finset.sum_const (f r)
+  have : 𝒜 = (Finset.range (n + 1)).biUnion (Finset.slice 𝒜) := by
+    ext A
+    rw[Finset.mem_biUnion]
+    apply Iff.intro
+    · intro h
+      use A.card
+      apply And.intro
+      · refine Finset.mem_range_succ_iff.mpr ?_
+        exact card_finset_fin_le A
+      rw[Finset.mem_slice]
+      exact And.symm ⟨rfl, h⟩
+    intro h
+    obtain ⟨_, ⟨_, h⟩⟩ := h
+    exact (Finset.mem_slice.mp h).left
+  calc ∑ A ∈ 𝒜, f A.card
+    = ∑ r ∈ Finset.range (n + 1),
+        ∑ A ∈ 𝒜.slice r, f A.card := by
+        rw[←Finset.sum_biUnion]
+        · exact Finset.sum_congr this fun x ↦ congrFun rfl
+        intro r hr r' hr' hneq
+        unfold Function.onFun
+        rw[Finset.disjoint_left]
+        intro A hA h
+        obtain ⟨_, h1⟩ := Finset.mem_slice.mp hA
+        obtain ⟨_, h2⟩ := Finset.mem_slice.mp h
+        refine hneq ?_
+        exact Finset.eq_of_mem_slice hA h
+  _ = ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * f r := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      rw [←hh i]
+      refine Finset.sum_congr rfl ?_
+      intro A hA
+      have := (Finset.mem_slice.mp hA).right
+      subst this
+      rfl
+
+-- (∑ r ∈ range(n + 1), (𝒜.slice r).card) / X =
 
 theorem sperners (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
     𝒜.card ≤ n.choose (n/2) := by
