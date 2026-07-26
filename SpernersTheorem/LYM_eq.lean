@@ -252,15 +252,19 @@ lemma CountingB_eq {𝒜 : Family n}
         exact this
 
 theorem G_empty_of_A_empty {n} (hk : k ≤ n) :
-    G (∅ : Family n) k hk = ∅ := by
+    G (∅ : Family n) k = ∅ := by
   induction k with
   |zero =>
-    unfold G F
+    unfold G
     exact Finset.val_eq_zero.mp rfl
   |succ k ih =>
     unfold G
-    simp_all only [Finset.shadow_empty, Finset.union_empty]
-    exact Finset.val_eq_zero.mp rfl
+    simp_all only [Order.add_one_le_iff, Finset.union_eq_empty]
+    refine ⟨?_, ?_⟩
+    · rfl
+    rw [ih (le_of_lt hk)]
+    exact Finset.shadow_empty
+
 
 
 
@@ -271,7 +275,7 @@ theorem local_lym_mul_eq {n r} (𝒜 : Family n) (hr : 0 < r) (hrn : r ≤ n) (h
   exact h𝒜
 
 theorem G_subsets (𝒜 : Family n) (A : Finset (Fin n)) (hA : A ∈ 𝒜) (k : ℕ) (hk : k ≤ n) :
-    ∀ B ⊆ A, B.card = (n - k) → B ∈ G 𝒜 k hk := by
+    ∀ B ⊆ A, B.card = (n - k) → B ∈ G 𝒜 k := by
   induction k with
   |zero =>
     intro B hB hBcard
@@ -282,7 +286,6 @@ theorem G_subsets (𝒜 : Family n) (A : Finset (Fin n)) (hA : A ∈ 𝒜) (k : 
         exact le_of_le_of_eq (card_finset_fin_le A) hBcard.symm
       exact Finset.eq_of_subset_of_card_le hB this
     rw[hBA]
-    unfold F
     refine Finset.mem_slice.mpr ?_
     refine ⟨hA, ?_⟩
     rw[←hBA, hBcard]
@@ -315,7 +318,6 @@ theorem G_subsets (𝒜 : Family n) (A : Finset (Fin n)) (hA : A ∈ 𝒜) (k : 
       rw[Finset.mem_sdiff] at hx
       exact hx.right
     left
-    unfold F
     rw[Finset.mem_slice]
     refine ⟨?_, ?_⟩
     · rw[h]
@@ -326,33 +328,30 @@ theorem G_subsets (𝒜 : Family n) (A : Finset (Fin n)) (hA : A ∈ 𝒜) (k : 
 
 
 
-theorem G_local_lym_mul_eq' (𝒜 : Family n) :
-    ∀ (k : ℕ) (hk : k < n),
-    (G 𝒜 k (le_of_lt hk)).shadow.card * (k + 1) = (G 𝒜 k (le_of_lt hk)).card * (n - k)
-      → (G 𝒜 k (le_of_lt hk)) = ∅ ∨ (G 𝒜 k (le_of_lt hk)) = Layer n (n - k) := by
+theorem G_local_lym_mul_eq (𝒜 : Family n) :
+    ∀ k < n, (G 𝒜 k).shadow.card * (k + 1) = (G 𝒜 k).card * (n - k)
+      → (G 𝒜 k) = ∅ ∨ (G 𝒜 k) = Layer n (n - k) := by
   intro k hk h
   have h0 : 0 < n - k := by omega
   have hkn : n - k ≤ n := by omega
-  refine (local_lym_mul_eq (G 𝒜 k (by omega)) h0 hkn ?_).mp ?_
+  refine (local_lym_mul_eq (G 𝒜 k) h0 hkn ?_).mp ?_
   · exact G_lay 𝒜 k (le_of_lt hk)
   have : (n - (n - k - 1)) = k + 1 := by omega
   rw[this]
   exact h
 
+theorem G_local_lym (𝒜 : Family n) :
+    ∀ k < n, ((G 𝒜 k).card : ℚ) / n.choose k ≤ ((G 𝒜 k).shadow.card : ℚ) / n.choose (k + 1) := by
+  intro k hk
+  have := local_lym (G 𝒜 k) (G_lay 𝒜 k hk.le) (Nat.sub_le n k) (Nat.zero_lt_sub_of_lt hk)
+  rw[Nat.choose_symm, (Nat.sub_sub n k 1), Nat.choose_symm] at this
+  · exact this
+  · exact Nat.succ_le_of_lt hk
+  exact hk.le
 
-theorem G_local_lym_mul_eq (𝒜 : Family n) (k : ℕ) (hklt : k < n)
-    (h : (G 𝒜 k (by omega)).shadow.card * (k + 1) = (G 𝒜 k (by omega)).card * (n - k)) :
-    (G 𝒜 k (by omega)) = ∅ ∨ (G 𝒜 k (by omega)) = Layer n (n - k) := by
-  have h0 : 0 < n - k := by omega
-  have hkn : n - k ≤ n := by omega
-  refine (local_lym_mul_eq (G 𝒜 k (by omega)) h0 hkn ?_).mp ?_
-  · exact G_lay 𝒜 k (le_of_lt hklt)
-  have : (n - (n - k - 1)) = k + 1 := by omega
-  rw[this]
-  exact h
 
 theorem Gn_empty_iff (𝒜 : Family n) :
-    (G 𝒜 n (by omega)) = ∅ ↔ 𝒜 = ∅ := by
+    (G 𝒜 n) = ∅ ↔ 𝒜 = ∅ := by
   apply Iff.intro
   · intro h
     by_contra!
@@ -365,35 +364,31 @@ theorem Gn_empty_iff (𝒜 : Family n) :
 
 
 theorem G123 (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (hne : Finset.Nonempty 𝒜)
-    (h : ∀ k, (hk : k ≤ n) → (G 𝒜 k hk) = ∅ ∨ (G 𝒜 k hk) = Layer n (n - k)) :
+    (h : ∀ k ≤ n, (G 𝒜 k) = ∅ ∨ (G 𝒜 k) = Layer n (n - k)) :
     ∃ i ≤ n, 𝒜.slice i = Layer n i := by
-
-  by_cases hEx : ∃ (i : ℕ) (hi : i ≤ n), G 𝒜 i hi = Layer n (n - i)
-  -- sorry
-  -- by_cases hEx : ∃ i ≤ n, G 𝒜 i (by sorry) = Layer n (n - i)
+  by_cases hEx : ∃ i ≤ n, G 𝒜 i = Layer n (n - i)
   · set b := Nat.find hEx with hb
     have hspec := Nat.find_spec hEx
     rcases hspec with ⟨hbn, hG⟩
     rw[←hb] at hbn
-    have hG : G 𝒜 b hbn = Layer n (n - b) := by
+    have hG : G 𝒜 b = Layer n (n - b) := by
       exact Finset.val_inj.mp (congrArg Finset.val hG)
     use (n - b)
-    have hmin : ∀ (i : ℕ) (hi : i < b), G 𝒜 i (Nat.le_trans (Nat.le_of_lt hi) hbn) = ∅ := by
+    have hmin : ∀ (i : ℕ) (hi : i < b), G 𝒜 i = ∅ := by
       intro i hi
       have hile : i ≤ n := (Nat.le_trans (Nat.le_of_lt hi) hbn)
-      have hneq : G 𝒜 i hile ≠ Layer n (n - i) := by
+      have hneq : G 𝒜 i ≠ Layer n (n - i) := by
         intro hEq
         apply (Nat.find_min hEx hi)
         exact ⟨hile, hEq⟩
       exact Or.resolve_right (h i hile) hneq
     refine ⟨Nat.sub_le n b, ?_⟩
     rcases b with h0 | c
-    · unfold G F at hG
+    · unfold G at hG
       simp only [tsub_zero]
       simp only [tsub_zero] at hG
       exact hG
-    unfold G F at hG
-    simp only at hG
+    unfold G at hG
     have hem := hmin c (by omega)
     rw[hem, Finset.shadow_empty, Finset.union_empty] at hG
     exact hG
@@ -450,40 +445,8 @@ theorem layer_maximal (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (i : �
   omega
 
 
-theorem lym123help (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜)
-  (h : ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * r.factorial * (n - r).factorial
-    = n.factorial) :
-  ∀ (r : ℕ) (hr : r ≤ n), ∑ i ∈ Finset.range (r + 1), (𝒜.slice (n-i)).card * (n-i).factorial *
-    i.factorial = (G 𝒜 r hr).card * r.factorial * (n-r).factorial := by
-  intro r hr
-  induction r with
-  |zero =>
-    sorry -- doable but annoying
-  |succ r ih =>
-    have ih := ih (Nat.le_of_succ_le hr)
-
-
-
-theorem lym_help (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜)
-  (h : ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * r.factorial * (n - r).factorial
-      = n.factorial) :
-    ∀ (r : ℕ)(hr : r < n), (G 𝒜 r (le_of_lt hr)).shadow.card * (r + 1)
-      = (G 𝒜 r (le_of_lt hr)).card * (n - r) := by
-  by_contra! ⟨k, hk, hneq⟩
-  have hle := G_local_lym_mul 𝒜 k hk
-  have hlt := lt_of_le_of_ne hle hneq.symm
-  have := t2 𝒜 h𝒜 k (Nat.le_of_lt hk)
-  have : ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * r.factorial * (n - r).factorial
-      < n.factorial := by
-
-  omega
-
-
-
-
-
 theorem Gn_or (𝒜 : Family n) (hn : n ≤ n) :
-    G 𝒜 n hn = ∅ ∨ G 𝒜 n hn = Layer n 0 := by
+    G 𝒜 n = ∅ ∨ G 𝒜 n = Layer n 0 := by
   have h:= G_lay 𝒜 n hn
   rw[Nat.sub_self] at h
   have : Layer n 0 = {∅} := by
@@ -493,95 +456,177 @@ theorem Gn_or (𝒜 : Family n) (hn : n ≤ n) :
   rw [←Finset.subset_singleton_iff]
   exact h
 
+theorem form_change (a b n k : ℕ) (hk : k < n) :
+    b * (k + 1) = a * (n - k) ↔ (b : ℚ) / n.choose (k + 1) = (a : ℚ) / n.choose k := by
+  have : ↑(n.choose k) ≠ 0 := by
+    exact Nat.choose_ne_zero_iff.mpr hk.le
+  have : ↑(n.choose (k + 1)) ≠ 0 := by
+    exact Nat.choose_ne_zero_iff.mpr hk
+  apply Iff.intro
+  · intro h
+    field_simp
+    rw [←Nat.cast_mul, ←Nat.cast_mul, Rat.natCast_inj]
+    have hk1 : k + 1 ≠ 0 := by
+      exact Ne.symm (Nat.zero_ne_add_one k)
+    refine mul_right_cancel₀ hk1 ?_
+    rw[Nat.mul_assoc, Nat.mul_comm (n.choose k), ← Nat.mul_assoc, h,
+      Nat.mul_assoc (n.choose (k + 1)), Nat.mul_comm a (k + 1), ←Nat.mul_assoc (n.choose (k + 1)),
+      Nat.choose_succ_right_eq]
+    ring_nf
+  intro h
+  field_simp at h
+  rw [←Nat.cast_mul, ←Nat.cast_mul, Rat.natCast_inj] at h
+  rw[Nat.mul_comm]
+  refine mul_left_cancel₀ this ?_
+  rw[←Nat.mul_assoc, ←Nat.mul_assoc, ←h, Nat.choose_succ_right_eq]
+  ring
 
-theorem lym_mul_eq (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
-    ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card *
-      r.factorial * (n - r).factorial = n.factorial ↔ ∃ i ≤ n, 𝒜 = Layer n i := by
-    apply Iff.intro
-    · intro h
-      have := lym_help 𝒜 h𝒜 h
-      have hN: Finset.Nonempty 𝒜 := by
-        by_contra!
-        have : ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * r.factorial *(n-r).factorial = 0 := by
-          refine Finset.sum_eq_zero ?_
-          intro r hr
-          aesop
-        rw[this] at h
-        exact (Nat.factorial_ne_zero n) h.symm
-      have : ∃ i ≤ n, 𝒜.slice i = Layer n i := by
-        refine G123 𝒜 h𝒜 hN ?_
-        intro r hr
-        rcases (lt_or_eq_of_le hr) with hlt | heq
-        · exact G_local_lym_mul_eq' 𝒜 r hlt (this r hlt)
-        subst r
-        rw[Nat.sub_self]
-        exact Gn_or 𝒜 hr
-      rcases this with ⟨i, hin, h⟩
-      use i
-      exact ⟨hin, layer_maximal 𝒜 h𝒜 i hin h⟩
-    intro ⟨i, hi⟩
-    calc ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * r.factorial * (n - r).factorial
-      = (Finset.slice 𝒜 i).card * i.factorial * (n - i).factorial +
-        ∑ x ∈ Finset.range (n + 1) \ {i},
-          (Finset.slice 𝒜 x).card * x.factorial * (n - x).factorial := by
-          have : i ∈ Finset.range (n + 1) := by
-            exact Finset.mem_range_succ_iff.mpr hi.left
-          rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem this]
-    _ = (𝒜.slice i).card * i.factorial * (n - i).factorial := by
-          have : ∑ x ∈ Finset.range (n + 1) \ {i},
-            (Finset.slice 𝒜 x).card * x.factorial * (n - x).factorial = 0 := by
-            refine Finset.sum_eq_zero ?_
-            intro x hx
-            rw[Finset.mem_sdiff] at hx
-            have hx := hx.right
-            rw[Finset.mem_singleton] at hx
-            have : (𝒜.slice x).card = 0 := by
-              rw[Finset.slice]
-              refine Finset.card_filter_eq_zero_iff.mpr ?_
-              intro y hy
-              rw[hi.right, Layer, Finset.mem_powersetCard_univ] at hy
-              rw[hy]
-              exact Ne.intro fun a ↦ hx (id (Eq.symm a))
-            rw[this]
-            ring
-          rw[this]
-          exact Nat.add_eq_left.mpr rfl
-    _ = n.choose i * i.factorial * (n - i).factorial := by
-          have : (𝒜.slice i).card = n.choose i := by
-            rw[hi.right]
-            have : (Layer n i).slice i = Layer n i := by
-              refine Finset.ext_iff.mpr ?_
-              intro A
-              apply Iff.intro
-              · intro h
-                exact (Finset.mem_slice.mp h).left
-              intro h
-              rw[Finset.mem_slice]
-              refine And.intro h ?_
-              unfold Layer at h
-              exact Finset.mem_powersetCard_univ.mp h
-            rw[this]
-            exact card_layer
-          rw[this]
-    _ = n.factorial := by
-          exact Nat.choose_mul_factorial_mul_factorial hi.left
 
-theorem lym_eq1 (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜)
+theorem G_local_lym_eq (𝒜 : Family n) (k : ℕ) (hk : k < n)
+    (h : ((G 𝒜 k).card : ℚ) / n.choose k = ((G 𝒜 k).shadow.card : ℚ) / n.choose (k + 1)) :
+    (G 𝒜 k) = ∅ ∨ (G 𝒜 k) = Layer n (n - k) := by
+  refine G_local_lym_mul_eq 𝒜 k hk ?_
+  refine (form_change (G 𝒜 k).card (G 𝒜 k).shadow.card n k hk).mpr h.symm
+
+
+theorem lym_eq'' (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜)
     (hc : ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / (n.choose r) = 1) :
-    ∀ r ∈ Finset.range (n + 1),
-      G 𝒜 (n - r) (by omega) = ∅ ∨ G 𝒜 (n - r) (by omega) = Layer n (n - r) := by
-  by_contra! ⟨i, hi, hi', hi''⟩
-  have : ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / (n.choose r) < 1 := by
-    sorry
-  simp_all only [Finset.mem_range, Order.lt_add_one_iff, ne_eq, lt_self_iff_false]
+    ∀ k ≤ n, ∑ r ∈ Finset.range (k + 1),
+      ((𝒜.slice (n - r)).card : ℚ) / (n.choose (n - r)) = ((G 𝒜 k).card : ℚ) / n.choose k := by
+  by_contra! ⟨k, hkn, hk⟩
+  have hk := lt_of_le_of_ne (lym_sum 𝒜 h𝒜 k hkn) hk
+  have : ∀ (i : ℕ), k ≤ i → i ≤ n → ∑ r ∈ Finset.range (i + 1),
+      ((𝒜.slice (n - r)).card : ℚ) / n.choose (n - r) < ((G 𝒜 i).card : ℚ) / n.choose i := by
+    intro i hki hin
+    have h : ∀ d, ∀ j, j = k + d → j ≤ n →  ∑ r ∈ Finset.range (j + 1),
+        ((𝒜.slice (n - r)).card : ℚ) / n.choose (n - r) < ((G 𝒜 j).card : ℚ) / n.choose j := by
+      intro d
+      induction d with
+      |zero =>
+        intro j hjk hjn
+        rw[add_zero] at hjk
+        subst hjk
+        exact hk
+      |succ j' ih =>
+        intro j hjk hjn
+        have ih := ih (k + j') rfl (by omega)
+        calc ∑ r ∈ Finset.range (j + 1), ((𝒜.slice (n - r)).card : ℚ) / n.choose (n - r)
+          = ∑ r ∈ Finset.range (k + j' + 1 + 1),
+            ((𝒜.slice (n - r)).card : ℚ) / n.choose (n - r) := by
+              rw[hjk]
+              ring_nf
+        _ = ∑ r ∈ Finset.range (k + j' + 1), ((𝒜.slice (n - r)).card : ℚ) / n.choose (n - r)
+            + ((𝒜.slice (n - (k + j' + 1))).card : ℚ) / n.choose (n - (k + j' + 1)) := by
+              rw[Finset.sum_range_succ
+                (fun x ↦ ((𝒜.slice (n-x)).card : ℚ) / n.choose (n - x)) (k + j' + 1)]
+        _ < ((G 𝒜 (k + j')).card : ℚ) / n.choose (k + j')
+            + ((𝒜.slice (n - (k + j' + 1))).card : ℚ) / n.choose (k + j' + 1) := by
+              rw[Nat.choose_symm]
+              · exact Rat.add_lt_add_right.mpr ih
+              omega
+        _ ≤ ((G 𝒜 (k + j')).shadow.card : ℚ ) / n.choose (k + j' + 1)
+              + ((𝒜.slice (n - (k + j' + 1))).card : ℚ) / n.choose (k + j' + 1) := by
+              refine Rat.add_le_add_right.mpr ?_
+              exact G_local_lym 𝒜 (k + j') (by omega)
+        _ = ((G 𝒜 (k + j')).shadow.card
+              + (𝒜.slice (n - (k + j' + 1))).card : ℚ) / n.choose (k + j' + 1) := by
+              field
+        _ = ((G 𝒜 (k + j' + 1)).card : ℚ) / n.choose (k + j' + 1) := by
+              rw[G_card 𝒜 h𝒜 (k + j')]
+              · aesop
+              omega
+        _ = ((G 𝒜 j).card : ℚ) / n.choose j := by
+              rw[hjk]
+              ring_nf
+    have : i = k + (i - k) := by omega
+    exact h (i - k) i this hin
+  have h:= this n hkn n.le_refl
+  have h' : ((G 𝒜 n).card : ℚ) / n.choose n ≤ 1 := by
+    rw[Nat.choose_self, ←Nat.cast_div, Nat.div_one]
+    · exact Nat.cast_le_one.mpr (Gn_card 𝒜)
+    · exact Nat.one_dvd (Finset.card (G 𝒜 n))
+    exact Rat.abs_pos_iff.mp rfl
+  apply ne_of_lt (lt_of_lt_of_le h h')
+  rw[← hc]
+  refine Finset.sum_bij (fun i hi => n - i) ?_ ?_ ?_ ?_
+  · intro i hi
+    exact Finset.mem_range_succ_iff.mpr (Nat.sub_le n i)
+  · intro a ha b hb hdiff
+    simp_all only [Finset.mem_range, Order.lt_add_one_iff]
+    omega
+  · intro i hi
+    rw[Finset.mem_range] at hi
+    refine ⟨(n - i), ?_, ?_⟩
+    · rw[Finset.mem_range]
+      omega
+    omega
+  intros
+  rfl
+
+theorem lym_eq' (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜)
+    (hc : ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / (n.choose r) = 1) :
+    ∀ k < n, ((G 𝒜 k).card : ℚ) / n.choose k = ((G 𝒜 k).shadow.card : ℚ) / n.choose (k + 1) := by
+  by_contra! ⟨k, hkn, hG⟩
+  have hG := lt_of_le_of_ne (G_local_lym 𝒜 k hkn) hG
+  set Sk1 := ∑ r ∈ Finset.range (k + 1 + 1),
+      ((𝒜.slice (n - r)).card : ℚ) / (n.choose (n - r)) with hSk1
+  set Sk := ∑ r ∈ Finset.range (k + 1),
+      ((𝒜.slice (n - r)).card : ℚ) / (n.choose (n - r)) with hSk
+  have h1: Sk1 = ((G 𝒜 (k + 1)).card : ℚ) / n.choose (k + 1) :=
+    lym_eq'' 𝒜 h𝒜 hc (k + 1) (Nat.succ_le_of_lt hkn)
+  have h2: Sk ≤ ((G 𝒜 k).card : ℚ) / n.choose k := by
+    exact lym_sum 𝒜 h𝒜 k hkn.le
+  have h3: Sk1 = Sk + ((𝒜.slice (n - (k + 1))).card : ℚ) / n.choose (k + 1) := by
+    have h := Finset.sum_range_succ (fun x ↦ ((𝒜.slice (n-x)).card : ℚ) / n.choose (n - x)) (k + 1)
+    rw[←hSk, ←hSk1, Nat.choose_symm] at h
+    · exact h
+    exact Order.add_one_le_iff.mpr hkn
+  have h4: Sk1 < ((G 𝒜 (k + 1)).card : ℚ) / n.choose (k + 1) := by
+    calc Sk1
+      = Sk + ((𝒜.slice (n - (k + 1))).card : ℚ) / n.choose (k + 1) := by assumption
+    _ ≤ ((G 𝒜 k).card : ℚ) / n.choose k
+      + ((𝒜.slice (n - (k + 1))).card : ℚ) / n.choose (k + 1) := by
+        exact Rat.add_le_add_right.mpr h2
+    _ < ((G 𝒜 k).shadow.card : ℚ) / n.choose (k + 1)
+      + ((𝒜.slice (n - (k + 1))).card : ℚ) / n.choose (k + 1) := by
+        exact Rat.add_lt_add_right.mpr hG
+    _ = (((G 𝒜 k).shadow.card : ℚ) + ((𝒜.slice (n - (k + 1))).card : ℚ)) / n.choose (k + 1) := by
+        field_simp
+    _ = ((G 𝒜 (k + 1)).card : ℚ) / n.choose (k + 1) := by
+        rw[←Nat.cast_add, G_card 𝒜 h𝒜 k hkn]
+  refine (lt_self_iff_false Sk1).mp ?_
+  rw[←h1] at h4
+  exact h4
 
 
 
 theorem lym_eq (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜)
     (hc : ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / (n.choose r) = 1) :
     ∃ i ≤ n, 𝒜 = Layer n i := by
-  refine (lym_mul_eq 𝒜 h𝒜).mp ?_
-  sorry
+  have := lym_eq' 𝒜 h𝒜 hc
+  have : ∀ k ≤ n, (G 𝒜 k) = ∅ ∨ (G 𝒜 k) = Layer n (n - k) := by
+    intro k hk
+    rcases hk.lt_or_eq with hlt | heq
+    · exact G_local_lym_eq 𝒜 k hlt (this k hlt)
+    subst k
+    rw[Nat.sub_self]
+    exact Gn_or 𝒜 hk
+  have hnon: Finset.Nonempty 𝒜 := by
+    by_contra!
+    have : ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / n.choose r = 0 := by
+      rw[Finset.sum_eq_zero_iff_of_nonneg]
+      · intro i hi
+        rw[this]
+        aesop
+      intro i hi
+      refine Rat.div_nonneg ?_ ?_
+      · exact Rat.natCast_nonneg
+      exact Rat.natCast_nonneg
+    rw[this] at hc
+    exact zero_ne_one hc
+  have : ∃ i ≤ n, 𝒜.slice i = Layer n i := G123 𝒜 h𝒜 hnon this
+  obtain ⟨i, hi, hL⟩ := this
+  exact ⟨i, hi, layer_maximal 𝒜 h𝒜 i hi hL⟩
 
 theorem choose_le_succ_of_lt_half_left {r n : ℕ} (h : r < n / 2) :
     n.choose r < n.choose (r + 1) := by

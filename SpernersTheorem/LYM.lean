@@ -21,10 +21,6 @@ theorem IsSubsetAntichain.subset (𝒜 : Family n) (h𝒜 : IsSubsetAntichain �
 abbrev Layer (n k : ℕ) : Family n :=
   (Finset.univ : Finset (Fin n)).powersetCard k
 
--- def incidences (𝒜 : Family n) :
---     Finset (Finset (Fin n) × Finset (Fin n)) :=
---   (𝒜.product (Finset.shadow 𝒜)).filter
---     (fun p => p.2 ⊆ p.1)
 
 def fiberOver {n} (𝒜 : Family n) (A : Finset (Fin n)) :
     Finset (Finset (Fin n)) :=
@@ -34,8 +30,6 @@ def incidences (𝒜 : Family n) :
     Finset (Finset (Fin n) × Finset (Fin n)) :=
   𝒜.biUnion fun A =>
     (fiberOver 𝒜 A).image (fun B => (A, B))
-
--- {(A, B) : A ∈ 𝒜, B ∈ fiberOver 𝒜 A}
 
 theorem mem_incidences_iff (𝒜 : Family n) : -- incidences are equivalent to original definitions
     (A, B) ∈ incidences 𝒜 ↔
@@ -124,6 +118,41 @@ theorem fiber_equiv (𝒜 : Family n) (hA : A ∈ 𝒜) (hlay : 𝒜 ⊆ Layer n
   exact (Finset.erase_inj A left).mp right
 
 
+theorem shadow_layer (𝒜 : Family n) (h𝒜 : 𝒜 = Layer n r) (hr : 0 < r) (hrn : r ≤ n) :
+    𝒜.shadow = Layer n (r - 1) := by
+  rw[h𝒜]
+  refine Finset.ext_iff.mpr ?_
+  intro A
+  apply Iff.intro
+  · intro hA
+    rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at hA
+    obtain ⟨B, hB, _, hc⟩ := hA
+    unfold Layer
+    refine Finset.mem_powersetCard_univ.mpr ?_
+    unfold Layer at hB
+    rw[Finset.mem_powersetCard_univ] at hB
+    rw[hB] at hc
+    omega
+  intro hA
+  rw[Layer, Finset.mem_powersetCard_univ] at hA
+  rw[Finset.mem_shadow_iff_exists_mem_card_add_one]
+  have : Finset.Nonempty Aᶜ := by
+    rw[Finset.compl_eq_univ_sdiff]
+    refine Finset.sdiff_nonempty_of_card_lt_card ?_
+    rw[hA]
+    subst h𝒜
+    simp_all only [Finset.card_univ, Fintype.card_fin]
+    omega
+  obtain ⟨a, ha⟩ := this
+  use insert a A
+  refine ⟨?_, ?_, ?_⟩
+  · refine Finset.mem_powersetCard_univ.mpr ?_
+    rw[Finset.card_insert_of_notMem]
+    · omega
+    exact Finset.mem_compl.mp ha
+  · exact Finset.subset_insert a A
+  refine Finset.card_insert_of_notMem ?_
+  exact Finset.mem_compl.mp ha
 
 
 
@@ -286,7 +315,6 @@ def incidencesByShadow (𝒜 : Family n) :
   (Finset.shadow 𝒜).biUnion fun B =>
     (upperFiber 𝒜 B).image (fun A => (A, B))
 
--- {(A, B) : }
 
 theorem incidences_eq_byShadow :
     incidences 𝒜 = incidencesByShadow 𝒜 := by
@@ -368,130 +396,122 @@ lemma CountingB {𝒜 : Family n}
 
 
 theorem local_lym_mul {n r} (𝒜 : Family n) (hr : 0 < r) (h𝒜 : 𝒜 ⊆ Layer n r) :
-    𝒜.shadow.card * (n - (r - 1)) ≥ 𝒜.card * r := by
-  nth_rw 2 [← CountingA]
-  · rw[ge_iff_le]
-    exact CountingB hr h𝒜
+    𝒜.card * r ≤ 𝒜.shadow.card * (n - (r - 1)) := by
+  rw [← CountingA]
+  · exact CountingB hr h𝒜
   exact h𝒜
 
 
 
-theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hrn : r ≤ n) (hr : r < 0) :
-    (𝒜.shadow.card : ℚ) / (Layer n (r-1)).card ≥ 𝒜.card / ↑(Layer n r).card := by
-  sorry
+theorem local_lym {n r} (𝒜 : Family n) (h𝒜 : 𝒜 ⊆ Layer n r) (hrn : r ≤ n) (hr : 0 < r) :
+    (𝒜.card : ℚ) / n.choose r ≤ (𝒜.shadow.card : ℚ) / n.choose (r - 1):= by
+  have hL:= local_lym_mul 𝒜 hr h𝒜
+  calc _ = (𝒜.card : ℚ) * r.factorial * (n - r).factorial / n.factorial := by
+        have := Nat.choose_mul_factorial_mul_factorial hrn
+        have : (n.choose r : ℚ) * r.factorial * (n - r).factorial = n.factorial := by
+          exact_mod_cast this
+        field_simp
+        rw[←this]
+        field_simp
+        refine Rat.mul_div_cancel ?_
+        exact Nat.cast_ne_zero.mpr (Nat.choose_ne_zero hrn)
+  _ = (𝒜.card : ℚ) * r * (r-1).factorial * (n - r).factorial / n.factorial := by
+        rw[←Nat.mul_factorial_pred hr.ne.symm]
+        simp_all only [Nat.cast_mul]
+        field
+  _ ≤ (𝒜.shadow.card : ℚ) * (r-1).factorial * (n - (r - 1)).factorial / n.factorial := by
+        field_simp
+        have : n - (r - 1) ≠ 0 := by omega
+        rw[←Nat.mul_factorial_pred this]
+        have : n - (r - 1) - 1 = n - r := by omega
+        rw[this]
+        simp_all only [ne_eq, Nat.cast_mul, ge_iff_le]
+        field_simp
+        rw [←Nat.cast_mul, ←Nat.cast_mul]
+        exact Rat.natCast_le_natCast.mpr hL
+  _ = (𝒜.shadow.card : ℚ) * ((r-1).factorial * (n - (r - 1)).factorial / n.factorial) := by
+        field
+  _ = (𝒜.shadow.card : ℚ) * (n.choose (r - 1) : ℚ)⁻¹ := by
+        simp_all only [mul_eq_mul_left_iff, Nat.cast_eq_zero, Finset.card_eq_zero]
+        left
+        have h' : r - 1 ≤ n := by omega
+        have hr1: ((r - 1).factorial : ℚ) ≠ 0 := Nat.cast_ne_zero.mpr
+          (Nat.factorial_ne_zero (r - 1))
+        have hnr1: ((n - (r - 1)).factorial : ℚ) ≠ 0 := Nat.cast_ne_zero.mpr
+          (Nat.factorial_ne_zero (n - (r - 1)))
+        have hn: (n.factorial : ℚ) ≠ 0 := Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero n)
+        have hnc: (n.choose (r - 1) : ℚ) ≠ 0 := Nat.cast_ne_zero.mpr (Nat.choose_ne_zero (by omega))
+        have hr1nr : ((r-1).factorial * (n - (r - 1)).factorial : ℚ) ≠ 0 := by
+          exact (mul_ne_zero_iff_right hnr1).mpr hr1
+        field_simp[hr1, hnr1, hn, hnc, hr1nr]
+        rw[←Nat.cast_mul, ←Nat.cast_mul]
+        have := Nat.choose_mul_factorial_mul_factorial h'
+        refine Rat.natCast_inj.mpr ?_
+        rw[← this]
+        ring
+  _ = (𝒜.shadow.card : ℚ) / n.choose (r - 1):= by
+        field
 
-theorem shadow_ninter_slice (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (r : Fin n) :
-    Disjoint (𝒜.slice r) (𝒜.slice r.succ).shadow := by
-  refine Finset.disjoint_left.mpr ?_
-  intro A hA h
-  rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at h
-  obtain ⟨B, hB, hAB, hcard⟩ := h
-  have : A ≠ B := by
-    intro h
-    rw[h] at hcard
-    omega
-  apply this
-  rw[IsSubsetAntichain] at h𝒜
-  have hA𝒜 : A ∈ 𝒜 := by
-    exact Finset.mem_of_mem_filter A hA
-  have hB𝒜 : B ∈ 𝒜 := by
-    exact Finset.mem_of_mem_filter B hB
-  exact IsAntichain.eq h𝒜 hA𝒜 hB𝒜 hAB
 
-def F (𝒜 : Family n) (r : Fin (n + 1)) :
-    Family n :=
-  𝒜.slice r
+noncomputable def G (𝒜 : Family n) : (k : ℕ) → Family n
+| 0 =>
+  𝒜.slice n
+| k + 1 =>
+  𝒜.slice (n - (k + 1)) ∪ (G 𝒜 k).shadow
 
--- structure Ff (𝒜 : Family n) (r : Fin (n + 1)) where
-
-noncomputable def G (𝒜 : Family n) : (k : ℕ) → k ≤ n → Family n
-| 0, h =>
-  F 𝒜 ⟨n, by omega⟩
-| k + 1, h =>
-  let hk : k ≤ n := by omega
-  let r : Fin (n + 1) :=
-    ⟨n - (k + 1), by omega⟩
-  F 𝒜 r ∪ (G 𝒜 k hk).shadow
-
-theorem F_antichain (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (r : Fin (n + 1)) :
-    IsSubsetAntichain (F 𝒜 r) := by
-  refine IsSubsetAntichain.subset 𝒜 h𝒜 ?_
-  unfold F
-  exact Finset.slice_subset
-
-
-theorem G0_card (𝒜 : Family n) :
-    Finset.card (G 𝒜 (0 : Fin (n + 1)) (by omega)) = Finset.card (F 𝒜 ⟨n, by omega⟩) := by
-  exact Finset.card_sdiff_eq_card_sdiff_iff.mp rfl
 
 theorem G_in_some_F (𝒜 : Family n) (k : ℕ) (hk : k ≤ n) :
-    ∀ B ∈ G 𝒜 k hk, ∃ A ∈ 𝒜, B ⊆ A := by
+    ∀ B ∈ G 𝒜 k, ∃ A ∈ 𝒜, B ⊆ A := by
   induction k with
   | zero =>
     intro B hB
     use B
-    unfold G at hB
-    unfold F at hB
-    rw[Finset.mem_slice] at hB
-    exact And.intro (hB.left) (subset_refl B)
+    rw[G, Finset.mem_slice] at hB
+    exact ⟨hB.left, subset_refl B⟩
   | succ i ih =>
     intro B hB
-    unfold G at hB
-    simp only at hB
-    rw[Finset.mem_union] at hB
-    rcases hB with hF | hG
-    · unfold F at hF
-      use B
-      rw[Finset.mem_slice] at hF
-      exact And.intro (hF.left) (subset_refl B)
-    rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at hG
-    obtain ⟨C, hC, hBC, _⟩ := hG
-    obtain ⟨A', hA', hCA'⟩ := ih (Nat.le_of_succ_le hk) C hC
-    use A'
-    exact And.intro hA' (subset_trans hBC hCA')
+    rw[G, Finset.mem_union] at hB
+    rcases hB with h | h
+    · use B
+      rw[Finset.mem_slice] at h
+      exact ⟨h.left, subset_refl B⟩
+    rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at h
+    obtain ⟨C, hG, hBC, _⟩ := h
+    obtain ⟨A, hA, hCA⟩ := ih (Nat.le_of_succ_le hk) C hG
+    exact ⟨A, hA, subset_trans hBC hCA⟩
+
 
 
 theorem G_disj (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (k : ℕ) (hk : k < n) :
-    Disjoint (F 𝒜 ⟨n - (k + 1), by omega⟩) (G 𝒜 k (by omega)).shadow := by
-  refine Finset.disjoint_left.mpr ?_
+    Disjoint (𝒜.slice (n - (k + 1))) (G 𝒜 k).shadow := by
+  rw [Finset.disjoint_right]
   intro A hA h
-  rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at h
-  obtain ⟨B, hB, hAB, hcard⟩ := h
+  rw[Finset.mem_shadow_iff_exists_mem_card_add_one] at hA
+  obtain ⟨B, hB, hAB, hcard⟩ := hA
   obtain ⟨C, hC, hBC⟩ := G_in_some_F 𝒜 k (le_of_lt hk) B hB
-  unfold IsSubsetAntichain at h𝒜
-  unfold F at hA
-  rw[Finset.mem_slice] at hA
-  have : A ≠ C := by
-    have hABs : A ⊂ B := by
-      refine Finset.ssubset_iff_subset_ne.mpr ?_
-      refine And.intro hAB ?_
-      intro h
-      rw[h] at hcard
-      omega
-    have : A ⊂ C := by
-      exact Finset.ssubset_of_ssubset_of_subset hABs hBC
-    exact Std.ne_of_lt this
-  apply this
-  exact h𝒜.eq hA.left hC (subset_trans hAB hBC)
-
+  rw[Finset.mem_slice] at h
+  have := (h𝒜.eq h.left hC (subset_trans hAB hBC))
+  rw[this] at hcard
+  have : B.card ≤ C.card := by
+    exact Finset.card_le_card hBC
+  omega
 
 theorem G_card (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (k : ℕ) (hk : k < n) :
-    (G 𝒜 (k + 1) (by omega)).card = (G 𝒜 k (by omega)).shadow.card +
-      (F 𝒜 ⟨n - (k + 1), by omega⟩).card := by
+    (G 𝒜 (k + 1)).card = (G 𝒜 k).shadow.card +
+      (𝒜.slice (n - (k + 1))).card := by
   rw[G]
   have := Finset.card_union_of_disjoint (G_disj 𝒜 h𝒜 k hk)
   rw[this]
   omega
 
 theorem G_lay (𝒜 : Family n) (k : ℕ) (hk : k ≤ n) :
-    (G 𝒜 k hk) ⊆ Layer n (n - k) := by
+    (G 𝒜 k) ⊆ Layer n (n - k) := by
   unfold Layer
   induction k with
   | zero =>
     intro A hA
     refine Finset.mem_powersetCard_univ.mpr ?_
     unfold G at hA
-    unfold F at hA
     obtain ⟨_, h⟩ := Finset.mem_slice.mp hA
     omega
   | succ i hi =>
@@ -500,8 +520,7 @@ theorem G_lay (𝒜 : Family n) (k : ℕ) (hk : k ≤ n) :
     unfold G at hA
     rw[Finset.mem_union] at hA
     rcases hA with hF | hG
-    · unfold F at hF
-      obtain ⟨_, h⟩ := Finset.mem_slice.mp hF
+    · obtain ⟨_, h⟩ := Finset.mem_slice.mp hF
       omega
     obtain ⟨B, hB, _, hc⟩ := Finset.mem_shadow_iff_exists_mem_card_add_one.mp hG
     have : i ≤ n := by omega
@@ -512,230 +531,84 @@ theorem G_lay (𝒜 : Family n) (k : ℕ) (hk : k ≤ n) :
       exact Finset.mem_powersetCard_univ.mp this
     omega
 
-
-
-theorem G_local_lym_mul (𝒜 : Family n) (k : ℕ) (hkle : k < n) :
-    (G 𝒜 k (by omega)).shadow.card * (k + 1) ≥ (G 𝒜 k (by omega)).card * (n - k) := by
-  set Gk := (G 𝒜 k (by omega)) with hGk
-  have hlay : Gk ⊆ Layer n (n - k) := by
-    exact G_lay 𝒜 k (by omega)
-  have : 0 < (n - k) := by omega
-  have h := local_lym_mul Gk this hlay
-  have : (n - (n - k - 1)) = k + 1 := by omega
-  rw[this] at h
-  exact h
+theorem Gn_card (𝒜 : Family n) :
+    (G 𝒜 n).card ≤ 1 := by
+  have := G_lay 𝒜 n (n.le_refl)
+  simp only [tsub_self, Finset.powersetCard_zero] at this
+  exact Finset.card_le_one_iff_subset_singleton.mpr ⟨∅, this⟩
 
 
 
 
-theorem t2 (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (r : ℕ) (hr : r ≤ n) :
-    (G 𝒜 r hr).card * r.factorial * (n-r).factorial ≥
-      ∑ i ∈ Finset.range (r + 1), (F 𝒜 ⟨n-i, by omega⟩).card * i.factorial * (n-i).factorial := by
+theorem lym_sum (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) (r : ℕ) (hr : r ≤ n) :
+  ∑ i ∈ Finset.range (r + 1), ((𝒜.slice (n - i)).card : ℚ)  / (n.choose (n - i)) ≤
+    ((G 𝒜 r).card : ℚ) / (n.choose r) := by
   induction r with
-  | zero =>
+  |zero =>
     unfold G
-    rw[Finset.sum_range_one]
-    ring_nf!
-    omega
-  | succ j ih =>
-    have hjn': j ≤ n := by omega
-    have ih := ih hjn'
-    have hjn : j < n := by omega
-    have := G_card 𝒜 h𝒜 j hjn
-    rw[this]
-    have hloc := ge_iff_le.mp (G_local_lym_mul 𝒜 j hjn)
-    set Gr := (G 𝒜 j hjn')
-    set Fj := (F 𝒜 ⟨n - (j + 1), (by omega)⟩)
-    set Gr1 := (G 𝒜 (j+1) hjn)
-    calc (Gr.shadow.card +
-      Fj.card) * (j + 1).factorial * (n - (j + 1)).factorial
-    = (Gr.shadow.card + Fj.card)
-      * (j + 1) * j.factorial * (n - (j + 1)).factorial := by
-          rw[Nat.factorial_succ]
-          ring
-  _  = Gr.shadow.card * (j + 1) * j.factorial * (n - (j + 1)).factorial +
-      Fj.card * (j + 1) * j.factorial * (n - (j + 1)).factorial := by
-          ring
-  _  ≥ (Gr.card * (n - j)) * j.factorial * (n - (j + 1)).factorial +
-      Fj.card * (j + 1) * j.factorial * (n - (j + 1)).factorial := by
-          rw[ge_iff_le]
-          have : (Gr.card * (n - j)) * j.factorial * (n - (j + 1)).factorial
-            ≤ Gr.shadow.card * (j + 1) * j.factorial * (n - (j + 1)).factorial := by
-              have : 0 ≤ (n - (j + 1)).factorial := by omega
-              refine mul_le_mul_of_nonneg_right ?_ this
-              exact mul_le_mul_of_nonneg_right hloc (by omega)
-          exact add_le_add_left this _
-  _ = (Gr.card * (n - j)) * j.factorial * (n - (j + 1)).factorial +
-        Fj.card * (j + 1).factorial * (n - (j + 1)).factorial := by
-        rw[Nat.factorial_succ]
-        ring
-  _ = Gr.card * j.factorial * ((n - j) * (n - j - 1).factorial) +
-        Fj.card * (j + 1).factorial * (n - (j + 1)).factorial := by
-        ring!
-  _ = Gr.card * j.factorial * (n - j).factorial +
-        Fj.card * (j + 1).factorial * (n - (j + 1)).factorial := by
-      have : (n - j) * (n - j - 1).factorial = (n - j).factorial := by
-        refine Nat.mul_factorial_pred ?_
-        omega
-      rw[this]
-  _ ≥ ∑ i ∈ Finset.range (j + 1),
-        Finset.card (F 𝒜 ⟨n - i, by omega⟩) * i.factorial * (n - i).factorial +
-        Fj.card * (j + 1).factorial * (n - (j + 1)).factorial := by
-      rw[ge_iff_le]
-      exact add_le_add_left ih _
-  _ =
-      ∑ i ∈ Finset.range (j + 1 + 1),
-        Finset.card (F 𝒜 ⟨n - i, (by omega)⟩) * i.factorial * (n - i).factorial := by
-          have : Finset.card (F 𝒜 ⟨n - (j + 1), (by omega)⟩) *
-              (j + 1).factorial * (n - (j + 1)).factorial =
-              Fj.card * (j + 1).factorial * (n - (j + 1)).factorial := by
-            ring
-          exact
-            Eq.symm
-              (Finset.sum_range_succ
-                (fun x ↦ Finset.card (F 𝒜 ⟨n - x, by omega⟩) * x.factorial * (n - x).factorial)
-                (j + 1))
+    aesop
+  |succ j ih =>
+    have := (Finset.sum_range_succ (fun x ↦ ((𝒜.slice (n-x)).card : ℚ) / n.choose (n - x)) (j + 1))
+    -- rw[this, ih (Nat.le_of_succ_le hr)]
+    let S := ∑ x ∈ Finset.range (j + 1), ((Finset.slice 𝒜 (n - x)).card : ℚ) / (n.choose (n - x))
+    calc _ = S + ((𝒜.slice (n - (j + 1))).card : ℚ) / n.choose (n - (j + 1)) := by
+          exact this
+      _ ≤ ((G 𝒜 j).card : ℚ) / n.choose j +  ((𝒜.slice (n - (j + 1))).card : ℚ)
+            / n.choose (n - (j + 1)) := by
+          rw [add_le_add_iff_right]
+          exact ih (Nat.le_of_succ_le hr)
+      _ ≤ ((G 𝒜 j).shadow.card : ℚ) / n.choose (j + 1) + ((𝒜.slice (n - (j + 1))).card : ℚ)
+            / n.choose (n - (j + 1)) := by
+          rw[add_le_add_iff_right]
+          have := local_lym (G 𝒜 j) (G_lay 𝒜 j (Nat.le_of_succ_le hr))
+            (Nat.sub_le n j) (Nat.zero_lt_sub_of_lt hr)
+          have hnj: (n - j - 1) = n - (j + 1) := by omega
+          rw[hnj, Nat.choose_symm, Nat.choose_symm] at this
+          · exact this
+          · exact hr
+          exact Nat.le_of_succ_le hr
+      _ = (((G 𝒜 j).shadow.card : ℚ) + ((𝒜.slice (n - (j + 1))).card : ℚ))
+            / (n.choose (j + 1) : ℚ) := by
+          rw[Nat.choose_symm]
+          · rw [add_div]
+          exact hr
+      _ = ((G 𝒜 (j + 1)).card : ℚ) / n.choose (j + 1):= by
+          have := G_card 𝒜 h𝒜 j (Nat.lt_of_succ_le hr)
+          rw[this]
+          simp only [Nat.cast_add]
 
 
-
-
-
-
-
-
-
-theorem lym_mult (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
-    ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card *
-      r.factorial * (n - r).factorial ≤ n.factorial := by
-  have hnn : n ≤ n := by omega
-  have h := t2 𝒜 h𝒜 n hnn
-  unfold F at h
-  rw[ge_iff_le] at h
-  set Gn := G 𝒜 n hnn
-  have hGncard : Gn.card ≤ 1 := by
-    have := G_lay 𝒜 n hnn
-    rw[tsub_self] at this
-    unfold Layer at this
-    have hc: ∀ A ∈ Gn, A.card = 0 := by
-      intro A hA
-      unfold Gn at hA
-      rw[Finset.subset_powersetCard_univ_iff] at this
-      exact Set.powersetCard.mem_iff.mp (this hA)
-    refine Finset.card_le_one_iff_subset_singleton.mpr ?_
-    use ∅
-    refine Finset.subset_singleton_iff'.mpr ?_
-    intro A hA
-    have := hc A hA
-    exact Finset.card_eq_zero.mp (hc A hA)
-  have : ∑ i ∈ Finset.range (n + 1), (𝒜.slice (n - i)).card * i.factorial * (n - i).factorial =
-          ∑ i ∈ Finset.range (n + 1), (𝒜.slice i).card * i.factorial * (n - i).factorial := by
-        refine Finset.sum_bij ?_ ?_ ?_ ?_ ?_
-        · exact (fun i hi => n - i)
-        · intro i hi
-          rw[Finset.mem_range]
-          omega
-        · intro a ha b hb heq
-          rw[Finset.mem_range] at ha hb
-          have hb := Nat.le_of_lt_succ hb
-          have ha := Nat.le_of_lt_succ ha
-          omega
-        · intro i hi
-          rw[Finset.mem_range] at hi
-          use (n - i)
-          refine exists_prop.mpr ?_
-          apply And.intro
-          · rw[Finset.mem_range]
-            omega
-          omega
-        intro i hi
-        rw[Finset.mem_range] at hi
-        have : (n - (n - i)) = i := by
-          omega
-        rw[this]
-        ring
-  rw[←this]
-  refine le_trans h ?_
-  simp_all only [tsub_self, Nat.factorial_zero, mul_one]
-  have : 0 ≤ n.factorial := by omega
-  nth_rw 2 [←one_mul n.factorial]
-  exact mul_le_mul_of_nonneg_right hGncard this
 
 
 
 theorem lym {n} (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
     ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ)  / (n.choose r) ≤ 1 := by
-  calc
-    ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ)  / (n.choose r)
-    = ∑ r ∈ Finset.range (n + 1),
-        ((𝒜.slice r).card : ℚ)  * r.factorial * (n - r).factorial / n.factorial := by
-      refine Finset.sum_congr rfl ?_
-      intro r hr
-      have hrn : r ≤ n := by
-        exact Finset.mem_range_succ_iff.mp hr
-      have := Nat.choose_mul_factorial_mul_factorial hrn
-      have : (n.choose r : ℚ) * r.factorial * (n - r).factorial = n.factorial := by
-        exact_mod_cast this
-      field_simp
-      rw[←this]
-      field_simp
-      refine Rat.mul_div_cancel ?_
-      exact Nat.cast_ne_zero.mpr (Nat.choose_ne_zero hrn)
-  _ = (n.factorial : ℚ)⁻¹ * ∑ r ∈ Finset.range (n + 1),
-        (𝒜.slice r).card * r.factorial * (n - r).factorial := by
-      field_simp
-      rw[Finset.mul_sum]
-      field_simp
-      simp_all only [Nat.cast_sum, Nat.cast_mul]
-  _ ≤ (n.factorial : ℚ)⁻¹ * n.factorial := by
-      have zero_le : 0 ≤ (n.factorial : ℚ)⁻¹ := Rat.inv_nonneg Rat.natCast_nonneg
-      refine Rat.mul_le_mul_of_nonneg_left ?_ zero_le
-      refine Rat.natCast_le_natCast.mpr ?_
-      exact lym_mult 𝒜 h𝒜
-  _ = 1 := by
-      exact Rat.inv_mul_cancel ↑n.factorial (Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero n))
+  have hlym := lym_sum 𝒜 h𝒜 n (n.le_refl)
+  simp only [Nat.choose_self, Nat.cast_one, div_one] at hlym
+  have : ∑ r ∈ Finset.range (n + 1), ((𝒜.slice r).card : ℚ) / (n.choose r) =
+      ∑ i ∈ Finset.range (n + 1), ((𝒜.slice (n - i)).card : ℚ) / (n.choose (n - i)) := by
+    refine Finset.sum_bij (fun i hi => n - i) ?_ ?_ ?_ ?_
+    · intro i hi
+      exact Finset.mem_range_succ_iff.mpr (Nat.sub_le n i)
+    · intro a ha b hb hdiff
+      simp_all only [Finset.mem_range, Order.lt_add_one_iff]
+      omega
+    · intro i hi
+      rw[Finset.mem_range] at hi
+      refine ⟨(n - i), ?_, ?_⟩
+      · rw[Finset.mem_range]
+        omega
+      omega
+    intro i hi
+    rw[Finset.mem_range] at hi
+    have : n - (n - i) = i := by
+      omega
+    simp_all only [Order.lt_add_one_iff]
+  rw[this]
+  exact Rat.le_trans hlym (Nat.cast_le_one.mpr (Gn_card 𝒜))
 
-lemma l1 (f : ℕ → ℚ) (𝒜 : Family n) :
-    ∑ A ∈ 𝒜, f A.card = ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * f r := by
-  have hh (r : ℕ): ∑ A ∈ 𝒜.slice r, f r = (𝒜.slice r).card * f r := by
-    exact Finset.sum_const (f r)
-  have : 𝒜 = (Finset.range (n + 1)).biUnion (Finset.slice 𝒜) := by
-    ext A
-    rw[Finset.mem_biUnion]
-    apply Iff.intro
-    · intro h
-      use A.card
-      apply And.intro
-      · refine Finset.mem_range_succ_iff.mpr ?_
-        exact card_finset_fin_le A
-      rw[Finset.mem_slice]
-      exact And.symm ⟨rfl, h⟩
-    intro h
-    obtain ⟨_, ⟨_, h⟩⟩ := h
-    exact (Finset.mem_slice.mp h).left
-  calc ∑ A ∈ 𝒜, f A.card
-    = ∑ r ∈ Finset.range (n + 1),
-        ∑ A ∈ 𝒜.slice r, f A.card := by
-        rw[←Finset.sum_biUnion]
-        · exact Finset.sum_congr this fun x ↦ congrFun rfl
-        intro r hr r' hr' hneq
-        unfold Function.onFun
-        rw[Finset.disjoint_left]
-        intro A hA h
-        obtain ⟨_, h1⟩ := Finset.mem_slice.mp hA
-        obtain ⟨_, h2⟩ := Finset.mem_slice.mp h
-        refine hneq ?_
-        exact Finset.eq_of_mem_slice hA h
-  _ = ∑ r ∈ Finset.range (n + 1), (𝒜.slice r).card * f r := by
-      refine Finset.sum_congr rfl ?_
-      intro i hi
-      rw [←hh i]
-      refine Finset.sum_congr rfl ?_
-      intro A hA
-      have := (Finset.mem_slice.mp hA).right
-      subst this
-      rfl
 
--- (∑ r ∈ range(n + 1), (𝒜.slice r).card) / X =
+
 
 theorem sperners (𝒜 : Family n) (h𝒜 : IsSubsetAntichain 𝒜) :
     𝒜.card ≤ n.choose (n/2) := by
