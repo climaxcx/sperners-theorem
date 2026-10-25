@@ -37,7 +37,8 @@ theorem mem_incidences_iff (𝒜 : Family n) : -- incidences are equivalent to o
   refine Iff.intro ?_ ?_
   · intro h
     rw[incidences] at h
-    simp_all only [Finset.mem_biUnion, Finset.mem_image, Prod.mk.injEq, exists_eq_right_right, true_and]
+    simp_all only [Finset.mem_biUnion, Finset.mem_image, Prod.mk.injEq,
+      exists_eq_right_right, true_and]
     obtain ⟨left, right⟩ := h
     apply And.intro
     · exact Finset.mem_of_mem_filter B right

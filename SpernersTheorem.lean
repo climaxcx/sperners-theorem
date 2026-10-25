@@ -1,1 +1,1 @@
-import SpernersTheorem.Basic
+import SpernersTheorem.LYM_eq
