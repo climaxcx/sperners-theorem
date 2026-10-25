@@ -9,5 +9,5 @@ The proof follows the presentation from the University of Oxford course C8.3 Com
 - [x] Local LYM
 - [x] LYM
 - [x] Sperner's Theorem
-- [ ] Equality case
-- [ ] ??
+- [x] Equality case
+- [ ] Improve readability of the proof
